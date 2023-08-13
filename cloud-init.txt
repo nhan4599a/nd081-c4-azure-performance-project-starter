@@ -4,7 +4,7 @@ packages:
   - nginx
   - python3-pip
   - unzip
-  - redis-server
+  - redis
 write_files:
   - owner: www-data:www-data
     path: /etc/nginx/sites-available/reverse-proxy.conf
@@ -20,7 +20,28 @@ write_files:
           proxy_cache_bypass $http_upgrade;
         }
       }
+  - owner: nhan4599:nhan4599
+    path: /etc/systemd/system/app.service
+    content: |
+      [Unit]
+      Description=azure vote app
+
+      [Service]
+      User=nhan4599
+      WorkingDirectory=/home/nhan4599
+      ExecStart=/usr/bin/python3 /home/nhan4599/nd081-c4-azure-performance-project-starter/azure-vote/main.py
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
 runcmd:
+  - cd /home/nhan4599
+  - git clone https://github.com/nhan4599a/nd081-c4-azure-performance-project-starter.git
+  - cd nd081-c4-azure-performance-project-starter
+  - git checkout Deploy_VMSS
+  - pip install -r requirements.txt
   - sudo unlink /etc/nginx/sites-enabled/default
   - sudo ln -s /etc/nginx/sites-available/reverse-proxy.conf /etc/nginx/sites-enabled/reverse-proxy.conf
+  - sudo systemctl daemon-reload
+  - sudo systemctl start app.service
   - sudo service nginx restart

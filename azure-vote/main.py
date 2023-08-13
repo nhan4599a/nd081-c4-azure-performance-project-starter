@@ -7,22 +7,18 @@ import sys
 import logging
 from datetime import datetime
 
-# App Insights
-# TODO: Import required libraries for App Insights
+from opencensus.ext.azure.log_exporter import AzureLogHandler, AzureEventHandler
 
-# Logging
-logger = # TODO: Setup logger
+az_log_logger = logging.getLogger(f'{__name__}-log')
+az_event_logger = logging.getLogger(f'{__name__}-event')
 
-# Metrics
-exporter = # TODO: Setup exporter
+az_log_logger.setLevel(logging.INFO)
+az_event_logger.setLevel(logging.INFO)
 
-# Tracing
-tracer = # TODO: Setup tracer
+az_log_logger.addHandler(AzureLogHandler(connection_string='InstrumentationKey=1a84096a-dfc6-4e86-80d8-85b87eba371f;IngestionEndpoint=https://eastasia-0.in.applicationinsights.azure.com/;LiveEndpoint=https://eastasia.livediagnostics.monitor.azure.com/'))
+az_event_logger.addHandler(AzureEventHandler(connection_string='InstrumentationKey=1a84096a-dfc6-4e86-80d8-85b87eba371f;IngestionEndpoint=https://eastasia-0.in.applicationinsights.azure.com/;LiveEndpoint=https://eastasia.livediagnostics.monitor.azure.com/'))
 
 app = Flask(__name__)
-
-# Requests
-middleware = # TODO: Setup flask middleware
 
 # Load configurations from environment or config file
 app.config.from_pyfile('config_file.cfg')
@@ -60,9 +56,14 @@ def index():
 
         # Get current values
         vote1 = r.get(button1).decode('utf-8')
-        # TODO: use tracer object to trace cat vote
         vote2 = r.get(button2).decode('utf-8')
-        # TODO: use tracer object to trace dog vote
+        properties = {
+            'custom_dimensions': {
+                'Cats vote': vote1,
+                'Dogs vote': vote2
+            }
+        }
+        az_log_logger.info('User voted', extra=properties)
 
         # Return index with values
         return render_template("index.html", value1=int(vote1), value2=int(vote2), button1=button1, button2=button2, title=title)
@@ -74,31 +75,26 @@ def index():
             # Empty table and return results
             r.set(button1,0)
             r.set(button2,0)
-            vote1 = r.get(button1).decode('utf-8')
-            properties = {'custom_dimensions': {'Cats Vote': vote1}}
-            # TODO: use logger object to log cat vote
+            az_log_logger.info('User reset')
+            az_event_logger.info('User reset')
 
-            vote2 = r.get(button2).decode('utf-8')
-            properties = {'custom_dimensions': {'Dogs Vote': vote2}}
-            # TODO: use logger object to log dog vote
-
-            return render_template("index.html", value1=int(vote1), value2=int(vote2), button1=button1, button2=button2, title=title)
+            return render_template("index.html", value1=0, value2=0, button1=button1, button2=button2, title=title)
 
         else:
 
             # Insert vote result into DB
             vote = request.form['vote']
             r.incr(vote,1)
+            az_event_logger.info(f'{vote} voted')
 
             # Get current values
             vote1 = r.get(button1).decode('utf-8')
+
             vote2 = r.get(button2).decode('utf-8')
 
             # Return results
             return render_template("index.html", value1=int(vote1), value2=int(vote2), button1=button1, button2=button2, title=title)
 
 if __name__ == "__main__":
-    # TODO: Use the statement below when running locally
-    app.run() 
-    # TODO: Use the statement below before deployment to VMSS
-    # app.run(host='0.0.0.0', threaded=True, debug=True) # remote
+    # app.run() 
+    app.run(host='0.0.0.0', threaded=True, debug=True) # remote
